@@ -27,7 +27,10 @@ def engineer_features(prices):
     return returns, volatility.dropna(), momentum.dropna()
 
 def calc_var(returns, confidence=0.95):
-    port_ret = returns.mean(axis=1)
+    if isinstance(returns, pd.DataFrame):
+        port_ret = returns.mean(axis=1)
+    else:
+        port_ret = returns
     return float(port_ret.quantile(1 - confidence))
 
 def calc_sharpe(portfolio_series, rfr=0.04):
