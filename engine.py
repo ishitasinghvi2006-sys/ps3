@@ -5,12 +5,19 @@ import os
 DATA_PATH = "data/raw/"
 
 def load_data():
-    multi = pd.read_csv(DATA_PATH + "multi_asset_dataset.csv", index_col=0, parse_dates=True)
-    
-    # Keep only numeric price columns
-    multi = multi.select_dtypes(include=[np.number])
-    multi = multi.ffill().bfill().dropna(axis=1, thresh=int(len(multi)*0.7))
-    return multi
+    multi = pd.read_csv(DATA_PATH + "multi_asset_dataset.csv", 
+                        index_col=0, parse_dates=True)
+    # Keep only pure price columns, drop return columns
+    price_cols = [c for c in multi.columns 
+                  if 'return' not in c.lower() and 'ret' not in c.lower()]
+    multi = multi[price_cols].select_dtypes(include=[np.number])
+    multi = multi.ffill().bfill()
+    # Remove columns that are all zeros or constant
+    multi = multi.loc[:, multi.std() > 0]
+    # Clip extreme values (outliers causing -99%)
+    multi = multi.clip(lower=multi.quantile(0.01), 
+                       upper=multi.quantile(0.99), axis=1)
+    return multi.dropna(axis=1, thresh=int(len(multi)*0.7))
 
 def load_macro():
     macro = pd.read_csv(DATA_PATH + "macro_dataset.csv", index_col=0, parse_dates=True)
@@ -35,8 +42,12 @@ def calc_var(returns, confidence=0.95):
 
 def calc_sharpe(portfolio_series, rfr=0.04):
     returns = portfolio_series.pct_change().dropna()
+    returns = returns.clip(-0.1, 0.1)  # clip extreme returns
     excess = returns.mean() * 252 - rfr
-    return float(excess / (returns.std() * np.sqrt(252)))
+    std = returns.std() * np.sqrt(252)
+    if std == 0:
+        return 0.0
+    return float(excess / std)
 
 def calc_max_drawdown(portfolio_series):
     roll_max = portfolio_series.cummax()
