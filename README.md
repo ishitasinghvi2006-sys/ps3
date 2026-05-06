@@ -4,7 +4,7 @@
 
 ---
 
-## 🌟 Highlights (Why This Wins)
+## 🌟 Highlights 
 
 - **Robust Risk Management**: Historical VaR (95%), Max Drawdown, Sharpe Ratio, Alpha/Beta — dynamically influencing position sizes.
 - **Intelligent Strategy**: SMA Crossover (20/50-day) + Momentum confirmation with inverse-volatility weighting and realistic costs.
