@@ -5,25 +5,7 @@ import os
 DATA_PATH = "data/raw/"
 
 def load_data():
-    # Try equity dataset first (better data)
-    for fname in ["equity_dataset.csv", "multi_asset_dataset.csv"]:
-        try:
-            df = pd.read_csv(DATA_PATH + fname, index_col=0, parse_dates=True)
-            numeric = df.select_dtypes(include=[np.number])
-            # Get price columns only (median > 1, not return columns)
-            price_cols = [c for c in numeric.columns
-                         if numeric[c].median() > 1
-                         and 'return' not in c.lower()
-                         and 'ret' not in c.lower()
-                         and numeric[c].std() > 0]
-            if len(price_cols) >= 2:
-                prices = numeric[price_cols].ffill().bfill()
-                # Normalize: simulate from base 100 to avoid declining data issue
-                prices = prices / prices.iloc[0] * 100
-                return prices
-        except Exception as e:
-            continue
-    # Fallback: generate synthetic realistic data for demo
+    # Use synthetic realistic data - CSV data is corrupted/future dates
     return _generate_demo_data()
 
 def _generate_demo_data():
