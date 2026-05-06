@@ -3,50 +3,52 @@ import numpy as np
 
 def generate_signals(prices, momentum, volatility):
     signals = pd.DataFrame(0, index=prices.index, columns=prices.columns)
-    # Simple moving average crossover + momentum
     sma20 = prices.rolling(20).mean()
     sma50 = prices.rolling(50).mean()
-    # BUY: price above SMA20, positive momentum
-    buy = (prices > sma20) & (momentum > 0.01)
-    # SELL: price below SMA20, negative momentum  
-    sell = (prices < sma20) & (momentum < -0.01)
-    signals[buy] = 1
-    signals[sell] = -1
+    # Mean reversion + trend following hybrid
+    trend_up = sma20 > sma50
+    mom_positive = momentum > 0.01
+    mom_negative = momentum < -0.02
+    signals[trend_up & mom_positive] = 1   # BUY
+    signals[~trend_up & mom_negative] = -1  # SELL
     return signals.fillna(0)
 
-def size_positions(signals, volatility, capital, max_pct=0.3):
-    buy_signals = signals.copy()
-    buy_signals[buy_signals < 0] = 0
-    # Equal weight among buy signals
-    n_buys = buy_signals.sum(axis=1).replace(0, 1)
-    weights = buy_signals.div(n_buys, axis=0)
-    weights = weights.clip(upper=max_pct)
-    return weights
+def size_positions(signals, volatility, capital, max_pct=0.35):
+    buy = signals.copy()
+    buy[buy < 0] = 0
+    # Inverse volatility weighting
+    inv_vol = 1.0 / (volatility.clip(lower=0.01))
+    inv_vol = inv_vol * buy  # only weight assets we're buying
+    row_sum = inv_vol.sum(axis=1).replace(0, 1)
+    weights = inv_vol.div(row_sum, axis=0).clip(upper=max_pct)
+    return weights.fillna(0)
 
 def apply_costs(trade_value, slippage=0.001, commission=0.0005):
     return trade_value * (1 - slippage - commission)
 
 def backtest(prices, signals, weights, capital):
-    portfolio_value = [capital]
-    returns = prices.pct_change().clip(-0.05, 0.05).fillna(0)
+    returns = prices.pct_change().clip(-0.1, 0.1).fillna(0)
     aligned = weights.reindex(returns.index).fillna(0)
-    cur_capital = float(capital)
-    for i in range(1, len(prices)):
-        w = aligned.iloc[i-1].values
-        r = returns.iloc[i].values
-        daily_return = float(np.dot(w, r))
-        # Transaction cost
-        if i > 1:
-            trades = np.abs(aligned.iloc[i] - aligned.iloc[i-1]).sum()
-            daily_return -= 0.001 * float(trades)
-        cur_capital *= (1 + daily_return)
-        cur_capital = max(cur_capital, 1)  # prevent going to zero
-        portfolio_value.append(cur_capital)
+    portfolio_value = []
+    cur = float(capital)
+    prev_w = pd.Series(0, index=prices.columns)
+    for i in range(len(prices)):
+        if i == 0:
+            portfolio_value.append(cur)
+            continue
+        w = aligned.iloc[i-1]
+        r = returns.iloc[i]
+        daily_ret = float((w * r).sum())
+        # Transaction cost on rebalancing
+        turnover = float((w - prev_w).abs().sum())
+        cost = 0.001 * turnover
+        cur = max(cur * (1 + daily_ret - cost), 1.0)
+        portfolio_value.append(cur)
+        prev_w = w
     return pd.Series(portfolio_value, index=prices.index)
 
 def rebalance_check(weights, target_weights, threshold=0.05):
     try:
-        drift = (weights - target_weights).abs()
-        return bool(drift.max() > threshold)
+        return bool((weights - target_weights).abs().max() > threshold)
     except:
         return False
