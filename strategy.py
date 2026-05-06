@@ -1,22 +1,12 @@
 import pandas as pd
 import numpy as np
-<<<<<<< HEAD
-=======
-
-def generate_signals(prices, momentum, volatility):
-    signals = pd.DataFrame(index=prices.index, columns=prices.columns, data=0)
-    signals[momentum > 0.05] = 1   # BUY if 5%+ momentum
-    signals[momentum < -0.05] = -1  # SELL
-    return signals  # Issue 8
->>>>>>> b95e9f2 (fix: add missing imports to strategy)
 
 def generate_signals(prices, momentum, volatility):
     signals = pd.DataFrame(0, index=prices.index, columns=prices.columns)
-    # Momentum strategy with volatility filter
     high_mom = momentum > 0.03
     low_vol = volatility < volatility.quantile(0.7, axis=0)
-    signals[high_mom & low_vol] = 1    # BUY
-    signals[momentum < -0.03] = -1    # SELL
+    signals[high_mom & low_vol] = 1
+    signals[momentum < -0.03] = -1
     return signals
 
 def size_positions(signals, volatility, capital, max_pct=0.25):
@@ -33,17 +23,14 @@ def backtest(prices, signals, weights, capital):
     portfolio_value = [capital]
     returns = prices.pct_change().fillna(0)
     aligned_weights = weights.reindex(returns.index).fillna(0)
-    
     for i in range(1, len(prices)):
         w = aligned_weights.iloc[i-1]
         r = returns.iloc[i]
         daily_return = (w * r).sum()
-        # Apply costs on signal changes
         signal_change = (signals.iloc[i] != signals.iloc[i-1]).sum()
-        cost = 0.0015 * signal_change / len(prices.columns)
+        cost = 0.0015 * signal_change / max(len(prices.columns), 1)
         capital *= (1 + daily_return - cost)
         portfolio_value.append(capital)
-    
     return pd.Series(portfolio_value, index=prices.index)
 
 def rebalance_check(weights, target_weights, threshold=0.05):
