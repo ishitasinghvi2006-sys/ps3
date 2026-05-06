@@ -1,5 +1,14 @@
 import pandas as pd
 import numpy as np
+<<<<<<< HEAD
+=======
+
+def generate_signals(prices, momentum, volatility):
+    signals = pd.DataFrame(index=prices.index, columns=prices.columns, data=0)
+    signals[momentum > 0.05] = 1   # BUY if 5%+ momentum
+    signals[momentum < -0.05] = -1  # SELL
+    return signals  # Issue 8
+>>>>>>> b95e9f2 (fix: add missing imports to strategy)
 
 def generate_signals(prices, momentum, volatility):
     signals = pd.DataFrame(0, index=prices.index, columns=prices.columns)
